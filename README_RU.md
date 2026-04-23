@@ -83,7 +83,7 @@ git clone https://github.com/your-username/comfyui-ap-tools.git
 ### 🔍 AP Image Compare
 **Категория**: `ap-tools`
 
-![image_conpare.mp4](assets/image_conpare.mp4)
+https://github.com/user-attachments/assets/95954dc6-0af3-4eb9-930e-3bb57473aa06
 
 Инструмент для сравнения двух и более изображений с различными режимами.
 
