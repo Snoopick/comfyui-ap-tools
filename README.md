@@ -84,6 +84,7 @@ No outputs (display only)
 **Category**: `ap-tools`
 
 ![image_compare.mp4](assets/image_compare.mp4)
+<video src="assets/image_compare.mp4" width="100%"></video>
 
 Tool for comparing two or more images with different modes.
 
