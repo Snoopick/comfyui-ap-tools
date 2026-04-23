@@ -1,0 +1,15 @@
+[project]
+name = "ap-tools"
+description = "A set of useful custom nodes for ComfyUI that improve convenience when working with images, file paths, and execution time."
+version = "1.0.0"
+license = "MIT" 
+
+[project.urls]
+Repository = "https://github.com/Snoopick/comfyui-ap-tools"
+"Bug Tracker" = "https://github.com/Snoopick/comfyui-ap-tools/issues"
+
+[tool.comfy]
+PublisherId = "snoopick"
+DisplayName = "comfyui-ap-tools"
+Icon = ""
+includes = [] 
