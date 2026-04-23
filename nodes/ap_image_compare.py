@@ -11,9 +11,9 @@ class APImageCompare:
         return {
             "required": {
                 "image_1": ("IMAGE",),
-                "image_2": ("IMAGE",),
             },
             "optional": {
+                "image_2": ("IMAGE",),
                 "image_3": ("IMAGE",),
                 "image_4": ("IMAGE",),
             },
@@ -34,11 +34,13 @@ class APImageCompare:
 
         return {"filename": filename, "subfolder": "", "type": "temp"}
 
-    def compare(self, image_1, image_2, image_3=None, image_4=None):
+    def compare(self, image_1, image_2=None, image_3=None, image_4=None):
         temp_dir = folder_paths.get_temp_directory()
 
         ts = int(time.time() * 1000)
-        images = [image_1, image_2]
+        images = [image_1]
+        if image_2 is not None:
+            images.append(image_2)
         if image_3 is not None:
             images.append(image_3)
         if image_4 is not None:

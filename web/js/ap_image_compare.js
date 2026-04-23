@@ -156,7 +156,34 @@ app.registerExtension({
             };
 
             const drawComparedImages = () => {
-                if (loadedImages.length < 2 || !loadedImages[idxA] || !loadedImages[idxB]) {
+                if (loadedImages.length === 0) {
+                    drawPlaceholder();
+                    return;
+                }
+
+                if (loadedImages.length === 1) {
+                    const imgA = loadedImages[0];
+                    const rect = canvasContainer.getBoundingClientRect();
+                    const cw = Math.max(1, Math.floor(rect.width));
+                    const ch = Math.max(1, Math.floor(rect.height));
+                    canvas.width = cw;
+                    canvas.height = ch;
+
+                    ctx.fillStyle = "#1a1a1a";
+                    ctx.fillRect(0, 0, cw, ch);
+
+                    const baseScale = Math.min(cw / imgA.width, ch / imgA.height);
+                    const drawW = imgA.width * baseScale * zoom;
+                    const drawH = imgA.height * baseScale * zoom;
+                    const ox = (cw - drawW) / 2 + panX;
+                    const oy = (ch - drawH) / 2 + panY;
+                    drawState = { ox, oy, drawW, drawH };
+
+                    ctx.drawImage(imgA, ox, oy, drawW, drawH);
+                    return;
+                }
+
+                if (!loadedImages[idxA] || !loadedImages[idxB]) {
                     drawPlaceholder("Need at least two valid images");
                     return;
                 }

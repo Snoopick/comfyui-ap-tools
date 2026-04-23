@@ -29,6 +29,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
 # API для шаблонов путей
 TEMPLATES_FILE = Path(__file__).parent / "templates.json"
 
+
 def load_templates():
     if not TEMPLATES_FILE.exists():
         return {}
@@ -38,19 +39,23 @@ def load_templates():
     except:
         return {}
 
+
 def save_templates(templates):
     with open(TEMPLATES_FILE, "w", encoding="utf-8") as f:
         json.dump(templates, f, indent=2, ensure_ascii=False)
+
 
 @server.PromptServer.instance.routes.get("/ap-tools/templates")
 async def get_templates(request):
     templates = load_templates()
     return web.json_response(list(templates.keys()))
 
+
 @server.PromptServer.instance.routes.get("/ap-tools/templates/all")
 async def get_all_templates(request):
     templates = load_templates()
     return web.json_response(templates)
+
 
 @server.PromptServer.instance.routes.post("/ap-tools/templates")
 async def save_template(request):
@@ -63,6 +68,7 @@ async def save_template(request):
     templates[name] = path
     save_templates(templates)
     return web.json_response({"success": True})
+
 
 @server.PromptServer.instance.routes.delete("/ap-tools/templates/{name}")
 async def delete_template(request):
@@ -80,3 +86,35 @@ async def delete_template(request):
 async def get_execution_timer_uptime(request):
     elapsed_seconds = max(0.0, time.time() - START_TIME)
     return web.json_response({"elapsed_seconds": elapsed_seconds})
+
+
+@server.PromptServer.instance.routes.post("/ap-tools/open-folder")
+async def open_folder(request):
+    data = await request.json()
+    path = data.get("path", "").strip()
+
+    if not path:
+        return web.Response(status=400, text="Missing path")
+
+    # Get parent directory if path points to a file
+    path_obj = Path(path)
+    if path_obj.is_file() or (not path_obj.exists() and "." in path_obj.name):
+        target_path = path_obj.parent
+    else:
+        target_path = path_obj
+
+    # Ensure we have an absolute path
+    if not target_path.is_absolute():
+        # If relative, try to resolve against ComfyUI root
+        target_path = Path.cwd() / target_path
+
+    try:
+        if os.name == "nt":
+            os.startfile(target_path)
+        elif os.name == "posix":
+            import subprocess
+
+            subprocess.run(["xdg-open", target_path], check=True)
+        return web.json_response({"success": True})
+    except Exception as e:
+        return web.json_response({"success": False, "error": str(e)}, status=500)

@@ -57,6 +57,7 @@ function createCustomTemplateManager(node) {
     relativePathInput.style.border = "1px solid #555";
     relativePathInput.style.borderRadius = "4px";
     relativePathInput.style.fontSize = "12px";
+    relativePathInput.style.marginTop = "5px";
     filePathRow.appendChild(relativePathInput);
 
     const buttonRow = document.createElement("div");
@@ -74,6 +75,16 @@ function createCustomTemplateManager(node) {
     saveBtn.style.cursor = "pointer";
     saveBtn.style.fontSize = "12px";
 
+    const openBtn = document.createElement("button");
+    openBtn.textContent = "Open Folder";
+    openBtn.style.padding = "4px 12px";
+    openBtn.style.backgroundColor = "#3a5a8e";
+    openBtn.style.color = "#fff";
+    openBtn.style.border = "none";
+    openBtn.style.borderRadius = "4px";
+    openBtn.style.cursor = "pointer";
+    openBtn.style.fontSize = "12px";
+
     const deleteBtn = document.createElement("button");
     deleteBtn.textContent = "Delete";
     deleteBtn.style.padding = "4px 12px";
@@ -85,6 +96,7 @@ function createCustomTemplateManager(node) {
     deleteBtn.style.fontSize = "12px";
 
     buttonRow.appendChild(saveBtn);
+    buttonRow.appendChild(openBtn);
     buttonRow.appendChild(deleteBtn);
 
     container.appendChild(topRow);
@@ -231,7 +243,34 @@ function createCustomTemplateManager(node) {
         }
     }
 
+    async function openFolder() {
+        const currentPath = filePathWidget.value;
+        if (!currentPath) {
+            alert("No path specified");
+            return;
+        }
+        
+        // Добавляем префикс output/ к пути, так как ComfyUI сохраняет изображения в этой директории
+        const outputPath = "ComfyUI/output/" + currentPath;
+        
+        try {
+            const resp = await fetch("/ap-tools/open-folder", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ path: outputPath })
+            });
+            
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.error || "Failed to open folder");
+            }
+        } catch (e) {
+            alert(`Failed to open folder: ${e.message}`);
+        }
+    }
+
     saveBtn.onclick = saveTemplate;
+    openBtn.onclick = openFolder;
     deleteBtn.onclick = deleteTemplate;
     templateSelect.onchange = applyTemplate;
     relativePathInput.addEventListener("input", syncFromVisibleInput);

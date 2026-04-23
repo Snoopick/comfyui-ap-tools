@@ -98,21 +98,29 @@ app.registerExtension({
             const ctx = canvas.getContext("2d");
             const lCtx = loupeCanvas.getContext("2d");
 
-            const drawPlaceholder = () => {
-                const dpr = window.devicePixelRatio || 1;
-                const rect = canvasContainer.getBoundingClientRect();
-                const w = Math.max(1, Math.floor(rect.width * dpr));
-                const h = Math.max(1, Math.floor(rect.height * dpr));
-                canvas.width = w;
-                canvas.height = h;
-                ctx.scale(dpr, dpr);
-                ctx.fillStyle = "#1a1a1a";
-                ctx.fillRect(0, 0, rect.width, rect.height);
-                ctx.fillStyle = "#888";
-                ctx.font = "14px sans-serif";
-                ctx.textAlign = "center";
-                ctx.fillText("Run queue to see preview", rect.width/2, rect.height/2);
-            };
+             const drawPlaceholder = (error = false) => {
+                 const dpr = window.devicePixelRatio || 1;
+                 const rect = canvasContainer.getBoundingClientRect();
+                 const w = Math.max(1, Math.floor(rect.width * dpr));
+                 const h = Math.max(1, Math.floor(rect.height * dpr));
+                 canvas.width = w;
+                 canvas.height = h;
+                 ctx.scale(dpr, dpr);
+                 ctx.fillStyle = "#1a1a1a";
+                 ctx.fillRect(0, 0, rect.width, rect.height);
+                 ctx.font = "14px sans-serif";
+                 ctx.textAlign = "center";
+                 if (error) {
+                     ctx.fillStyle = "#ff6b6b";
+                     ctx.fillText("Failed to load image", rect.width/2, rect.height/2 - 10);
+                     ctx.fillStyle = "#888";
+                     ctx.font = "12px sans-serif";
+                     ctx.fillText("Check console for details", rect.width/2, rect.height/2 + 15);
+                 } else {
+                     ctx.fillStyle = "#888";
+                     ctx.fillText("Run queue to see preview", rect.width/2, rect.height/2);
+                 }
+             };
 
             const renderImage = () => {
                 if (!this.apCurrentImage) { drawPlaceholder(); return; }
@@ -134,9 +142,9 @@ app.registerExtension({
                 ctx.drawImage(this.apCurrentImage, this.apOffsetX, this.apOffsetY, this.apDrawW, this.apDrawH);
             };
 
-            const updateNavigationControls = () => {
-                const successful = this.apAllImages.filter(i => i !== undefined);
-                const showNav = successful.length > 1 && this.apDisplayMode === "single";
+             const updateNavigationControls = () => {
+                 const successful = this.apAllImages.filter(i => i);
+                 const showNav = successful.length > 1 && this.apDisplayMode === "single";
                 prevButton.style.display = showNav ? "block" : "none";
                 nextButton.style.display = showNav ? "block" : "none";
                 imageCounter.style.display = showNav ? "block" : "none";
@@ -147,9 +155,9 @@ app.registerExtension({
                 }
             };
 
-            const showImage = (idx) => {
-                const successful = this.apAllImages.filter(i => i !== undefined);
-                if (idx >= 0 && idx < successful.length) {
+             const showImage = (idx) => {
+                 const successful = this.apAllImages.filter(i => i);
+                 if (idx >= 0 && idx < successful.length) {
                     this.apCurrentImageIndex = idx;
                     this.apCurrentImage = successful[idx];
                     renderImage();
@@ -157,9 +165,9 @@ app.registerExtension({
                 }
             };
 
-            const renderGrid = () => {
-                const successful = this.apAllImages.filter(i => i !== undefined);
-                if (!successful.length) { drawPlaceholder(); return; }
+             const renderGrid = () => {
+                 const successful = this.apAllImages.filter(i => i);
+                 if (!successful.length) { drawPlaceholder(true); return; }
                 const dpr = window.devicePixelRatio || 1;
                 const rect = canvasContainer.getBoundingClientRect();
                 const w = Math.max(1, Math.floor(rect.width * dpr));
@@ -200,10 +208,10 @@ app.registerExtension({
 
             const hideLoupe = () => { loupe.style.display = "none"; };
 
-            const getImageAtPosition = (mx, my) => {
-                if (this.apDisplayMode !== "grid") return this.apCurrentImage;
-                const successful = this.apAllImages.filter(i => i !== undefined);
-                if (!successful.length) return null;
+             const getImageAtPosition = (mx, my) => {
+                 if (this.apDisplayMode !== "grid") return this.apCurrentImage;
+                 const successful = this.apAllImages.filter(i => i);
+                 if (!successful.length) return null;
                 const col = Math.floor(mx / this.apGridCellW);
                 const row = Math.floor(my / this.apGridCellH);
                 if (col >= this.apGridCols || row >= this.apGridRows) return null;
@@ -219,10 +227,10 @@ app.registerExtension({
                 const my = cy - rect.top;
 
                 let imgX, imgY, scale;
-                if (this.apDisplayMode === "grid") {
-                    // In grid mode, calculate position relative to the specific image cell
-                    const successful = this.apAllImages.filter(i => i !== undefined);
-                    const index = successful.indexOf(this.apCurrentImage);
+                 if (this.apDisplayMode === "grid") {
+                     // In grid mode, calculate position relative to the specific image cell
+                     const successful = this.apAllImages.filter(i => i);
+                     const index = successful.indexOf(this.apCurrentImage);
                     if (index === -1) return hideLoupe();
                     const col = index % this.apGridCols;
                     const row = Math.floor(index / this.apGridCols);
@@ -267,17 +275,17 @@ app.registerExtension({
             });
             canvasContainer.addEventListener("mouseleave", hideLoupe);
 
-            modeSelect.addEventListener("change", e => {
-                this.apDisplayMode = e.target.value;
-                if (this.apDisplayMode === "single") {
-                    const ok = this.apAllImages.filter(i => i !== undefined);
-                    if (ok.length) {
-                        if (this.apCurrentImageIndex >= ok.length) this.apCurrentImageIndex = ok.length - 1;
-                        showImage(this.apCurrentImageIndex);
-                    }
-                } else render();
-                updateNavigationControls();
-            });
+             modeSelect.addEventListener("change", e => {
+                 this.apDisplayMode = e.target.value;
+                 if (this.apDisplayMode === "single") {
+                     const ok = this.apAllImages.filter(i => i);
+                     if (ok.length) {
+                         if (this.apCurrentImageIndex >= ok.length) this.apCurrentImageIndex = ok.length - 1;
+                         showImage(this.apCurrentImageIndex);
+                     }
+                 } else render();
+                 updateNavigationControls();
+             });
 
             prevButton.addEventListener("click", () => { if (this.apCurrentImageIndex > 0) showImage(this.apCurrentImageIndex - 1); });
             nextButton.addEventListener("click", () => { if (this.apCurrentImageIndex < this.apAllImages.length - 1) showImage(this.apCurrentImageIndex + 1); });
@@ -330,41 +338,43 @@ app.registerExtension({
             imgs.forEach((info, i) => {
                 const src = `/view?filename=${encodeURIComponent(info.filename)}&subfolder=${encodeURIComponent(info.subfolder || "")}&type=${info.type || "temp"}`;
                 const img = new Image();
-                img.onload = () => {
-                    this.apAllImages[i] = img;
-                    loaded++;
-                    if (loaded === imgs.length) {
-                        // Force mode to single when new data arrives
-                        this.apDisplayMode = "single";
-                        this.apModeSelect.value = "single";
-                        const ok = this.apAllImages.filter(i => i !== undefined);
-                        if (!ok.length) {
-                            this.apCurrentImage = null;
-                            this.apDrawPlaceholder();
-                        } else {
-                            // In single mode, show the first image
-                            this.apShowImage(0);
-                        }
-                        this.apUpdateNavigationControls();
-                    }
-                };
-                img.onerror = () => {
-                    loaded++;
-                    if (loaded === imgs.length) {
-                        // Force mode to single when new data arrives
-                        this.apDisplayMode = "single";
-                        this.apModeSelect.value = "single";
-                        const ok = this.apAllImages.filter(i => i !== undefined);
-                        if (!ok.length) {
-                            this.apCurrentImage = null;
-                            this.apDrawPlaceholder();
-                        } else {
-                            // In single mode, show the first image
-                            this.apShowImage(0);
-                        }
-                        this.apUpdateNavigationControls();
-                    }
-                };
+                 img.onload = () => {
+                     this.apAllImages[i] = img;
+                     loaded++;
+                     if (loaded === imgs.length) {
+                         // Force mode to single when new data arrives
+                         this.apDisplayMode = "single";
+                         this.apModeSelect.value = "single";
+                         const ok = this.apAllImages.filter(i => i);
+                         if (!ok.length) {
+                             this.apCurrentImage = null;
+                             this.apDrawPlaceholder(true);
+                         } else {
+                             // In single mode, show the first image
+                             this.apShowImage(0);
+                         }
+                         this.apUpdateNavigationControls();
+                     }
+                 };
+                 img.onerror = () => {
+                     console.error("Failed to load image:", src);
+                     this.apAllImages[i] = null;
+                     loaded++;
+                     if (loaded === imgs.length) {
+                         // Force mode to single when new data arrives
+                         this.apDisplayMode = "single";
+                         this.apModeSelect.value = "single";
+                         const ok = this.apAllImages.filter(i => i);
+                         if (!ok.length) {
+                             this.apCurrentImage = null;
+                             this.apDrawPlaceholder(true);
+                         } else {
+                             // In single mode, show the first image
+                             this.apShowImage(0);
+                         }
+                         this.apUpdateNavigationControls();
+                     }
+                 };
                 img.src = src;
             });
         };
