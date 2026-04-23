@@ -83,8 +83,7 @@ No outputs (display only)
 ### 🔍 AP Image Compare
 **Category**: `ap-tools`
 
-![image_compare.mp4](assets/image_compare.mp4)
-<video src="assets/image_compare.mp4" width="100%"></video>
+https://github.com/user-attachments/assets/95954dc6-0af3-4eb9-930e-3bb57473aa06
 
 Tool for comparing two or more images with different modes.
 
