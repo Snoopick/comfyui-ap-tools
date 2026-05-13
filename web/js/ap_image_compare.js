@@ -46,11 +46,15 @@ app.registerExtension({
             const panel = document.createElement("div");
             panel.style.padding = "8px";
             panel.style.backgroundColor = "#2a2a2a";
-            panel.style.display = "grid";
-            panel.style.gridTemplateColumns = "auto auto auto auto 1fr auto";
+            panel.style.display = "flex";
+            panel.style.flexDirection = "column";
             panel.style.gap = "8px";
-            panel.style.alignItems = "center";
             panel.style.borderTop = "1px solid #444";
+
+            const controlsPanel = document.createElement("div");
+            controlsPanel.style.display = "grid";
+            controlsPanel.style.gridTemplateColumns = "1fr 1fr";
+            controlsPanel.style.gap = "8px";
 
             const createLabel = (text) => {
                 const el = document.createElement("span");
@@ -70,8 +74,6 @@ app.registerExtension({
                 return el;
             };
 
-            const imageASelect = createSelect();
-            const imageBSelect = createSelect();
             const modeSelect = createSelect();
             const zoomSlider = document.createElement("input");
             zoomSlider.type = "range";
@@ -86,6 +88,8 @@ app.registerExtension({
             alphaSlider.max = "1";
             alphaSlider.step = "0.01";
             alphaSlider.value = "0.5";
+            
+
             const centerButton = document.createElement("button");
             centerButton.textContent = "Center";
             centerButton.style.backgroundColor = "#1f1f1f";
@@ -96,6 +100,7 @@ app.registerExtension({
             centerButton.style.cursor = "pointer";
             centerButton.style.width = "fit-content";
             centerButton.style.justifySelf = "start";
+            
             const resetButton = document.createElement("button");
             resetButton.textContent = "Reset";
             resetButton.style.backgroundColor = "#1f1f1f";
@@ -121,11 +126,77 @@ app.registerExtension({
                 <option value="split">Split</option>
             `;
 
-            panel.append(
-                createLabel("Image A"), imageASelect, createLabel(""), createLabel("Mode"), modeSelect, createLabel(""),
-                createLabel("Image B"), imageBSelect, createLabel(""), createLabel("Zoom"), zoomSlider, zoomValue,
-                createLabel("View"), centerButton, resetButton, createLabel("Blend"), alphaSlider, alphaValue
-            );
+            // Создаем блоки управления
+            const modeBlock = document.createElement("div");
+            modeBlock.style.display = "flex";
+            modeBlock.style.alignItems = "center";
+            modeBlock.style.gap = "8px";
+            modeBlock.append(createLabel("Mode"), modeSelect);
+
+            const zoomBlock = document.createElement("div");
+            zoomBlock.style.display = "flex";
+            zoomBlock.style.alignItems = "center";
+            zoomBlock.style.gap = "8px";
+            zoomBlock.append(createLabel("Zoom"), zoomSlider, zoomValue);
+            zoomSlider.style.flex = "1";
+
+            const viewBlock = document.createElement("div");
+            viewBlock.style.display = "flex";
+            viewBlock.style.alignItems = "center";
+            viewBlock.style.gap = "8px";
+            viewBlock.append(createLabel("View"), centerButton, resetButton);
+
+            const blendBlock = document.createElement("div");
+            blendBlock.style.display = "flex";
+            blendBlock.style.alignItems = "center";
+            blendBlock.style.gap = "8px";
+            blendBlock.append(createLabel("Blend"), alphaSlider, alphaValue);
+            alphaSlider.style.flex = "1";
+
+            // Добавляем панель управления в контейнер
+            controlsPanel.append(modeBlock, zoomBlock, viewBlock, blendBlock);
+            panel.appendChild(controlsPanel);
+
+            // Панель с кнопками групп Input_1, Input_2
+            const inputButtonPanel = document.createElement("div");
+            inputButtonPanel.style.display = "grid";
+            inputButtonPanel.style.gridTemplateColumns = "1fr 1fr";
+            inputButtonPanel.style.gap = "8px";
+
+            const createInputButtonGroup = (inputLabel) => {
+                const groupDiv = document.createElement("div");
+                groupDiv.style.display = "flex";
+                groupDiv.style.flexDirection = "column";
+                groupDiv.style.gap = "4px";
+
+                const groupLabel = document.createElement("div");
+                groupLabel.textContent = `Image ${inputLabel}`;
+                groupLabel.style.color = "#ccc";
+                groupLabel.style.fontSize = "11px";
+                groupLabel.style.textAlign = "center";
+                groupLabel.style.padding = "2px";
+                groupLabel.style.backgroundColor = "#333";
+                groupLabel.style.borderRadius = "3px";
+
+                const buttonContainer = document.createElement("div");
+                buttonContainer.style.display = "flex";
+                buttonContainer.style.flexDirection = "column";
+                buttonContainer.style.gap = "4px";
+
+                groupDiv.appendChild(groupLabel);
+                groupDiv.appendChild(buttonContainer);
+
+                return { groupDiv, buttonContainer };
+            };
+
+            const inputGroups = {};
+            ["1", "2"].forEach((label) => {
+                const group = createInputButtonGroup(label);
+                inputGroups[label] = group;
+                inputButtonPanel.appendChild(group.groupDiv);
+            });
+
+            panel.appendChild(inputButtonPanel);
             container.append(canvasContainer, panel);
 
             const ctx = canvas.getContext("2d");
@@ -134,6 +205,8 @@ app.registerExtension({
             let loadedImages = [];
             let idxA = 0;
             let idxB = 1;
+            let currentIndexPair = 0;
+            let imagePairs = [];
             let zoom = 1;
             let panX = 0;
             let panY = 0;
@@ -231,29 +304,91 @@ app.registerExtension({
                 }
             };
 
-            const refillSelectors = () => {
-                imageASelect.innerHTML = "";
-                imageBSelect.innerHTML = "";
-                imageEntries.forEach((_, idx) => {
-                    const label = `Image ${idx + 1}`;
-                    imageASelect.add(new Option(label, String(idx)));
-                    imageBSelect.add(new Option(label, String(idx)));
-                });
-
+            const updateDropdowns = () => {
                 if (!imageEntries.length) {
                     drawPlaceholder();
                     return;
                 }
 
-                idxA = Math.min(idxA, imageEntries.length - 1);
-                idxB = Math.min(idxB, imageEntries.length - 1);
-                if (idxA === idxB && imageEntries.length > 1) {
-                    idxB = (idxA + 1) % imageEntries.length;
-                }
-
-                imageASelect.value = String(idxA);
-                imageBSelect.value = String(idxB);
                 drawComparedImages();
+
+                // Очищаем старые кнопки
+                Object.values(inputGroups).forEach(group => {
+                    group.buttonContainer.innerHTML = "";
+                });
+
+                // Создаем кнопки для каждого входа
+                imageEntries.forEach((entry, idx) => {
+                    const label = entry.input_label;
+                    if (label && inputGroups[label]) {
+                        const btn = document.createElement("button");
+                        const batchInfo = entry.batch_size > 1 ? ` [${entry.batch_idx + 1}/${entry.batch_size}]` : "";
+                        btn.textContent = `Img ${entry.batch_idx + 1}${batchInfo}`;
+                        btn.style.backgroundColor = "#1f1f1f";
+                        btn.style.color = "#eee";
+                        btn.style.border = "1px solid #555";
+                        btn.style.borderRadius = "3px";
+                        btn.style.padding = "4px 6px";
+                        btn.style.cursor = "pointer";
+                        btn.style.fontSize = "11px";
+                        btn.style.width = "100%";
+
+                        // Подсветка если это текущее выбранное изображение
+                        if (idx === idxA || idx === idxB) {
+                            btn.style.backgroundColor = "#4a4a4a";
+                            btn.style.borderColor = "#888";
+                        }
+
+                        btn.addEventListener("click", () => {
+                            if (label === "1") {
+                                // Кнопка из Input_1 - устанавливаем как Image A
+                                idxA = idx;
+
+                                // Обновляем Image B если оно совпадает с новым Image A
+                                if (idxB === idxA) {
+                                    // Предпочитаем изображение из Input_2 для B
+                                    const input2Image = imageEntries.findIndex(entry => entry.input_label === "2");
+                                    if (input2Image !== -1) {
+                                        idxB = input2Image;
+                                    } else {
+                                        // Если нет изображений из Input_2, берем любое другое
+                                        for (let i = 0; i < imageEntries.length; i++) {
+                                            if (i !== idxA) {
+                                                idxB = i;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (label === "2") {
+                                // Кнопка из Input_2 - устанавливаем как Image B
+                                idxB = idx;
+
+                                // Обновляем Image A если оно совпадает с новым Image B
+                                if (idxA === idxB) {
+                                    // Предпочитаем изображение из Input_1 для A
+                                    const input1Image = imageEntries.findIndex(entry => entry.input_label === "1");
+                                    if (input1Image !== -1) {
+                                        idxA = input1Image;
+                                    } else {
+                                        // Если нет изображений из Input_1, берем любое другое
+                                        for (let i = 0; i < imageEntries.length; i++) {
+                                            if (i !== idxB) {
+                                                idxA = i;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            updateDropdowns();
+                            drawComparedImages();
+                        });
+
+                        inputGroups[label].buttonContainer.appendChild(btn);
+                    }
+                });
             };
 
             const loadImage = (info) =>
@@ -271,23 +406,7 @@ app.registerExtension({
                 outputs.forEach((el) => (el.style.display = "none"));
             };
 
-            imageASelect.addEventListener("change", () => {
-                idxA = Number(imageASelect.value);
-                if (idxA === idxB && loadedImages.length > 1) {
-                    idxB = (idxA + 1) % loadedImages.length;
-                    imageBSelect.value = String(idxB);
-                }
-                drawComparedImages();
-            });
 
-            imageBSelect.addEventListener("change", () => {
-                idxB = Number(imageBSelect.value);
-                if (idxA === idxB && loadedImages.length > 1) {
-                    idxA = (idxB + 1) % loadedImages.length;
-                    imageASelect.value = String(idxA);
-                }
-                drawComparedImages();
-            });
 
             modeSelect.addEventListener("change", drawComparedImages);
 
@@ -374,9 +493,41 @@ app.registerExtension({
                     panX = 0;
                     panY = 0;
                     splitRatio = parseFloat(alphaSlider.value);
-                    refillSelectors();
+                    
+                    if (imageEntries.length >= 2) {
+                        // Предпочитаем изображение из Input_1 для A
+                        const input1Image = imageEntries.findIndex(entry => entry.input_label === "1");
+                        idxA = input1Image !== -1 ? input1Image : 0;
+
+                        // Предпочитаем изображение из Input_2 для B
+                        const input2Image = imageEntries.findIndex(entry => entry.input_label === "2");
+                        idxB = input2Image !== -1 ? input2Image : (idxA === 0 ? 1 : 0);
+                    } else if (imageEntries.length === 1) {
+                        idxA = 0;
+                        idxB = 0;
+                    }
+
+                    generateImagePairs();
+                    if (imagePairs.length > 0) {
+                        currentIndexPair = 0;
+                    }
+                    
+                    updateDropdowns();
                 });
             };
+
+            const generateImagePairs = () => {
+                imagePairs = [];
+                for (let i = 0; i < imageEntries.length; i++) {
+                    for (let j = 0; j < imageEntries.length; j++) {
+                        if (i !== j) {
+                            imagePairs.push({a: i, b: j});
+                        }
+                    }
+                }
+            };
+
+
 
             const outputObserver = new MutationObserver(hideStandardOutput);
             if (this.element) {

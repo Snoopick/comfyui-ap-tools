@@ -28,8 +28,12 @@ app.registerExtension({
             this.apOffsetY = 0;
             this.apDrawW = 0;
             this.apDrawH = 0;
-            this.apCurrentZoom = 3;
-            this.apLastMouse = null;
+            this.apCurrentZoom = 1;
+            this.apPanX = 0;
+            this.apPanY = 0;
+            this.apIsDragging = false;
+            this.apLastDragX = 0;
+            this.apLastDragY = 0;
             this.apGridCols = 0;
             this.apGridRows = 0;
             this.apGridCellW = 0;
@@ -75,28 +79,26 @@ app.registerExtension({
             zoomLabel.style.cssText = "color:#ccc;font-size:12px";
             const zoomSlider = document.createElement("input");
             zoomSlider.type = "range";
-            zoomSlider.min = "1.5";
+            zoomSlider.min = "1.0";
             zoomSlider.max = "8.0";
             zoomSlider.step = "0.1";
-            zoomSlider.value = "3.0";
+            zoomSlider.value = "1.0";
             zoomSlider.style.flex = "1";
             const zoomValue = document.createElement("span");
-            zoomValue.textContent = "3.0x";
+            zoomValue.textContent = "1.0x";
             zoomValue.style.cssText = "color:#ccc;font-size:12px;min-width:46px;text-align:right";
+            const centerButton = document.createElement("button");
+            centerButton.textContent = "Center";
+            centerButton.style.cssText = "background:#3a3a3a;color:#ccc;border:1px solid #555;border-radius:3px;padding:2px 8px;cursor:pointer";
+            const resetButton = document.createElement("button");
+            resetButton.textContent = "Reset";
+            resetButton.style.cssText = "background:#3a3a3a;color:#ccc;border:1px solid #555;border-radius:3px;padding:2px 8px;cursor:pointer";
 
-            controlPanel.append(modeLabel, modeSelect, prevButton, imageCounter, nextButton, zoomLabel, zoomSlider, zoomValue);
+            controlPanel.append(modeLabel, modeSelect, prevButton, imageCounter, nextButton, zoomLabel, zoomSlider, zoomValue, centerButton, resetButton);
             container.appendChild(canvasContainer);
             container.appendChild(controlPanel);
 
-            const loupe = document.createElement("div");
-            loupe.style.cssText = "position:fixed;width:260px;height:260px;border:2px solid #888;box-shadow:0 4px 15px rgba(0,0,0,0.7);overflow:hidden;display:none;pointer-events:none;z-index:9999;background:#1a1a1a";
-            const loupeCanvas = document.createElement("canvas");
-            loupeCanvas.style.cssText = "width:100%;height:100%";
-            loupe.appendChild(loupeCanvas);
-            document.body.appendChild(loupe);
-
             const ctx = canvas.getContext("2d");
-            const lCtx = loupeCanvas.getContext("2d");
 
              const drawPlaceholder = (error = false) => {
                  const dpr = window.devicePixelRatio || 1;
@@ -133,10 +135,10 @@ app.registerExtension({
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.scale(dpr, dpr);
                 this.apScale = Math.min(rect.width / this.apCurrentImage.width, rect.height / this.apCurrentImage.height);
-                this.apDrawW = this.apCurrentImage.width * this.apScale;
-                this.apDrawH = this.apCurrentImage.height * this.apScale;
-                this.apOffsetX = (rect.width - this.apDrawW) / 2;
-                this.apOffsetY = (rect.height - this.apDrawH) / 2;
+                this.apDrawW = this.apCurrentImage.width * this.apScale * this.apCurrentZoom;
+                this.apDrawH = this.apCurrentImage.height * this.apScale * this.apCurrentZoom;
+                this.apOffsetX = (rect.width - this.apDrawW) / 2 + this.apPanX;
+                this.apOffsetY = (rect.height - this.apDrawH) / 2 + this.apPanY;
                 ctx.fillStyle = "#1a1a1a";
                 ctx.fillRect(0, 0, rect.width, rect.height);
                 ctx.drawImage(this.apCurrentImage, this.apOffsetX, this.apOffsetY, this.apDrawW, this.apDrawH);
@@ -160,6 +162,8 @@ app.registerExtension({
                  if (idx >= 0 && idx < successful.length) {
                     this.apCurrentImageIndex = idx;
                     this.apCurrentImage = successful[idx];
+                    this.apPanX = 0;
+                    this.apPanY = 0;
                     renderImage();
                     updateNavigationControls();
                 }
@@ -206,8 +210,6 @@ app.registerExtension({
             const dprChangeHandler = () => { render(); };
             window.addEventListener('resize', dprChangeHandler);
 
-            const hideLoupe = () => { loupe.style.display = "none"; };
-
              const getImageAtPosition = (mx, my) => {
                  if (this.apDisplayMode !== "grid") return this.apCurrentImage;
                  const successful = this.apAllImages.filter(i => i);
@@ -219,61 +221,43 @@ app.registerExtension({
                 if (index >= successful.length) return null;
                 return successful[index];
             };
-
-            const updateLoupe = (cx, cy) => {
-                if (!this.apCurrentImage) return hideLoupe();
-                const rect = canvasContainer.getBoundingClientRect();
-                const mx = cx - rect.left;
-                const my = cy - rect.top;
-
-                let imgX, imgY, scale;
-                 if (this.apDisplayMode === "grid") {
-                     // In grid mode, calculate position relative to the specific image cell
-                     const successful = this.apAllImages.filter(i => i);
-                     const index = successful.indexOf(this.apCurrentImage);
-                    if (index === -1) return hideLoupe();
-                    const col = index % this.apGridCols;
-                    const row = Math.floor(index / this.apGridCols);
-                    const cellX = col * this.apGridCellW;
-                    const cellY = row * this.apGridCellH;
-                    scale = Math.min(this.apGridCellW / this.apCurrentImage.width, this.apGridCellH / this.apCurrentImage.height);
-                    const drawW = this.apCurrentImage.width * scale;
-                    const drawH = this.apCurrentImage.height * scale;
-                    const offsetX = cellX + (this.apGridCellW - drawW) / 2;
-                    const offsetY = cellY + (this.apGridCellH - drawH) / 2;
-                    if (mx < offsetX || mx > offsetX + drawW || my < offsetY || my > offsetY + drawH) return hideLoupe();
-                    imgX = (mx - offsetX) / scale;
-                    imgY = (my - offsetY) / scale;
-                } else {
-                    // Single mode
-                    if (mx < this.apOffsetX || mx > this.apOffsetX + this.apDrawW || my < this.apOffsetY || my > this.apOffsetY + this.apDrawH) return hideLoupe();
-                    imgX = (mx - this.apOffsetX) / this.apScale;
-                    imgY = (my - this.apOffsetY) / this.apScale;
-                }
-
-                const lens = 260, sample = lens / this.apCurrentZoom;
-                const sx = Math.max(0, Math.min(this.apCurrentImage.width - sample, imgX - sample/2));
-                const sy = Math.max(0, Math.min(this.apCurrentImage.height - sample, imgY - sample/2));
-                loupeCanvas.width = lens; loupeCanvas.height = lens;
-                lCtx.imageSmoothingEnabled = false;
-                lCtx.clearRect(0, 0, lens, lens);
-                lCtx.drawImage(this.apCurrentImage, sx, sy, sample, sample, 0, 0, lens, lens);
-                loupe.style.left = cx + 20 + "px";
-                loupe.style.top = cy + 20 + "px";
-                loupe.style.display = "block";
-            };
-
-            canvasContainer.addEventListener("mousemove", e => {
-                this.apLastMouse = {x: e.clientX, y: e.clientY};
-                if (this.apDisplayMode === "grid") {
-                    const rect = canvasContainer.getBoundingClientRect();
-                    const mx = e.clientX - rect.left;
-                    const my = e.clientY - rect.top;
-                    this.apCurrentImage = getImageAtPosition(mx, my);
-                }
-                updateLoupe(e.clientX, e.clientY);
+            canvasContainer.addEventListener("mousedown", e => {
+                if (this.apDisplayMode !== "single" || this.apCurrentZoom <= 1 || !this.apCurrentImage) return;
+                this.apIsDragging = true;
+                this.apLastDragX = e.clientX;
+                this.apLastDragY = e.clientY;
             });
-            canvasContainer.addEventListener("mouseleave", hideLoupe);
+            window.addEventListener("mouseup", () => {
+                this.apIsDragging = false;
+            });
+            window.addEventListener("mousemove", e => {
+                if (!this.apIsDragging) return;
+                this.apPanX += e.clientX - this.apLastDragX;
+                this.apPanY += e.clientY - this.apLastDragY;
+                this.apLastDragX = e.clientX;
+                this.apLastDragY = e.clientY;
+                renderImage();
+            });
+            canvasContainer.addEventListener("mousemove", e => {
+                if (this.apDisplayMode !== "grid") return;
+                const rect = canvasContainer.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+                this.apCurrentImage = getImageAtPosition(mx, my);
+            });
+            canvasContainer.addEventListener("wheel", e => {
+                if (this.apDisplayMode !== "single") return;
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                this.apCurrentZoom = Math.min(8, Math.max(1, this.apCurrentZoom + delta));
+                zoomSlider.value = this.apCurrentZoom.toFixed(1);
+                zoomValue.textContent = this.apCurrentZoom.toFixed(1) + "x";
+                if (this.apCurrentZoom === 1) {
+                    this.apPanX = 0;
+                    this.apPanY = 0;
+                }
+                renderImage();
+            }, { passive: false });
 
              modeSelect.addEventListener("change", e => {
                  this.apDisplayMode = e.target.value;
@@ -283,7 +267,11 @@ app.registerExtension({
                          if (this.apCurrentImageIndex >= ok.length) this.apCurrentImageIndex = ok.length - 1;
                          showImage(this.apCurrentImageIndex);
                      }
-                 } else render();
+                 } else {
+                     this.apPanX = 0;
+                     this.apPanY = 0;
+                     render();
+                 }
                  updateNavigationControls();
              });
 
@@ -293,10 +281,27 @@ app.registerExtension({
             zoomSlider.addEventListener("input", e => {
                 this.apCurrentZoom = +e.target.value;
                 zoomValue.textContent = this.apCurrentZoom.toFixed(1) + "x";
-                if (this.apLastMouse) updateLoupe(this.apLastMouse.x, this.apLastMouse.y);
+                if (this.apCurrentZoom === 1) {
+                    this.apPanX = 0;
+                    this.apPanY = 0;
+                }
+                if (this.apDisplayMode === "single") renderImage();
+            });
+            centerButton.addEventListener("click", () => {
+                this.apPanX = 0;
+                this.apPanY = 0;
+                if (this.apDisplayMode === "single") renderImage();
+            });
+            resetButton.addEventListener("click", () => {
+                this.apPanX = 0;
+                this.apPanY = 0;
+                this.apCurrentZoom = 1;
+                zoomSlider.value = "1.0";
+                zoomValue.textContent = "1.0x";
+                if (this.apDisplayMode === "single") renderImage();
             });
 
-            const resizeObs = new ResizeObserver(() => { render(); if (this.apLastMouse) updateLoupe(this.apLastMouse.x, this.apLastMouse.y); });
+            const resizeObs = new ResizeObserver(() => { render(); });
             resizeObs.observe(canvasContainer);
 
             const hideStdOut = () => { if (!this.element) return; this.element.querySelectorAll(".comfy-output").forEach(el => el.style.display = "none"); };
@@ -312,10 +317,8 @@ app.registerExtension({
 
             this.addDOMWidget("preview", "custom", container, {
                 onRemove: () => {
-                    hideLoupe();
                     resizeObs.disconnect();
                     outObs.disconnect();
-                    if (loupe.parentNode) loupe.parentNode.removeChild(loupe);
                     window.removeEventListener('resize', dprChangeHandler);
                 },
             });

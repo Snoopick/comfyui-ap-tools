@@ -195,13 +195,13 @@ app.registerExtension({
             renderHistory(history);
             mainCounter.textContent = "00:00:00.000";
 
-            const restoreRuntimeState = () => {
-                const state = readRuntimeState();
-                if (!state || !state.isRunning) return;
-                startedAtMs = state.startedAtMs;
-                currentElapsedMs = Math.max(0, Date.now() - startedAtMs);
-                isRunning = true;
-                startCounter();
+            const clearRuntimeState = () => {
+                isRunning = false;
+                startedAtMs = 0;
+                currentElapsedMs = 0;
+                writeRuntimeState(false, 0);
+                stopCounter();
+                mainCounter.textContent = "00:00:00.000";
             };
 
             const handleExecutionStart = () => {
@@ -212,9 +212,10 @@ app.registerExtension({
                 startCounter();
             };
 
-            const handleExecutionEnd = () => {
+            const finalizeExecution = (endedAtMs) => {
                 if (!isRunning) return;
-                const elapsedMs = Math.max(0, Date.now() - startedAtMs);
+                const safeEndedAtMs = Number.isFinite(endedAtMs) ? endedAtMs : Date.now();
+                const elapsedMs = Math.max(0, safeEndedAtMs - startedAtMs);
                 currentElapsedMs = elapsedMs;
                 mainCounter.textContent = formatDuration(currentElapsedMs);
                 stopCounter();
@@ -223,17 +224,29 @@ app.registerExtension({
                 addHistoryEntry(elapsedMs);
             };
 
-            const handleStatus = (event) => {
-                const queueRemaining = event?.detail?.exec_info?.queue_remaining;
-                if (isRunning && queueRemaining === 0) {
-                    handleExecutionEnd();
-                }
+            const handleExecutionEnd = () => {
+                finalizeExecution(Date.now());
+            };
+
+            // ComfyUI docs: fires when all nodes of the prompt finished successfully.
+            const handleExecutionSuccess = () => {
+                finalizeExecution(Date.now());
+            };
+
+            const handleExecutionError = () => {
+                finalizeExecution(Date.now());
+            };
+
+            const handleExecutionInterrupted = () => {
+                finalizeExecution(Date.now());
             };
 
             api.addEventListener("execution_start", handleExecutionStart);
             api.addEventListener("execution_end", handleExecutionEnd);
-            api.addEventListener("status", handleStatus);
-            restoreRuntimeState();
+            api.addEventListener("execution_success", handleExecutionSuccess);
+            api.addEventListener("execution_error", handleExecutionError);
+            api.addEventListener("execution_interrupted", handleExecutionInterrupted);
+            clearRuntimeState();
 
             const onExecuted = this.onExecuted;
             this.onExecuted = function (message) {
@@ -241,6 +254,13 @@ app.registerExtension({
 
                 const payload = message?.ap_execution_timer?.[0];
                 if (!payload) return;
+
+                // Fallback path: when the tab/window is inactive, execution_end can be missed.
+                // In that case we finalize the run from node payload timestamp.
+                if (!isRunning || !document.hidden) return;
+                const payloadExecutedAtMs = Number(payload?.executed_at) * 1000;
+                const endedAtMs = Number.isFinite(payloadExecutedAtMs) ? payloadExecutedAtMs : Date.now();
+                finalizeExecution(endedAtMs);
             };
 
             container.append(title, mainCounter, historyTitle, historyList);
@@ -249,7 +269,9 @@ app.registerExtension({
                     stopCounter();
                     api.removeEventListener("execution_start", handleExecutionStart);
                     api.removeEventListener("execution_end", handleExecutionEnd);
-                    api.removeEventListener("status", handleStatus);
+                    api.removeEventListener("execution_success", handleExecutionSuccess);
+                    api.removeEventListener("execution_error", handleExecutionError);
+                    api.removeEventListener("execution_interrupted", handleExecutionInterrupted);
                 },
             });
 

@@ -35,4 +35,4 @@ class APImagePreview:
             )
 
         # Передаем в кастомное поле, чтобы не рисовался стандартный preview ComfyUI.
-        return {"ui": {"ap_preview": preview_images}, "result": ()}
+        return {"ui": {"ap_preview": preview_images, "ap_preview_mode": "single"}, "result": ()}
